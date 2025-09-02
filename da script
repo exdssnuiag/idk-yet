@@ -1,0 +1,383 @@
+-- IMPORTS
+local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/NeverJar/ImpactUI/main/ImpactUI.lua"))()
+local Window = Library:Create("General Script Hub", "All Games")
+
+-- SERVICES
+local RunService = game:GetService("RunService")
+local Players = game:GetService("Players")
+local TextChatService = game:GetService("TextChatService")
+local Lighting = game:GetService("Lighting")
+local UserInputService = game:GetService("UserInputService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local StarterGui = game:GetService("StarterGui")
+
+-- PLAYER
+local Player = Players.LocalPlayer
+
+-- CONNECTIONS
+local Connections = {
+	CFrameWalkConnection = nil;
+	ESP_Connection = nil;
+	ChatConnection = nil;
+	AutoRotateConnection = nil;
+	ZoomConnection = nil;
+	LightingConnection = nil;
+	NoclipConnection = nil;
+	InfiniteJumpConnection = nil;
+	JumpHeightConnection = nil;
+}
+
+-- VALUES
+local CFrameWalkSpeed = 16
+local ZoomValue = 64
+local InfiniteJumpCD = false
+local CurrentTarget = Player.Name
+local JumpHeight = 7.2
+
+local ClosestPlayer = nil
+local ShortestDistance = math.huge
+
+-- TABS
+local PlayerTab = Window:Tab("Player", true)
+local VisualTab = Window:Tab("Visual", false)
+local MiscTab = Window:Tab("Misc", false)
+
+-- PLAYER TAB
+PlayerTab:Label("Movement")
+
+PlayerTab:Toggle("CFrame Walk", function(bool)
+	CFrameWalk(bool)
+end)
+
+PlayerTab:Slider("CFrame Walkspeed", 0, 1000, function(value)
+	CFrameWalkSpeed = value
+end)
+
+PlayerTab:Toggle("Infinite Jump", function(bool)
+	InfiniteJump(bool)
+end)
+
+PlayerTab:Toggle("Custom JumpHeight", function(bool)
+	ChangeJumpHeight(bool)
+end)
+
+PlayerTab:Slider("JumpHeight", 0, 500, function(value)
+	JumpHeight = value
+end)
+
+PlayerTab:Label("Teleportation")
+
+PlayerTab:Button("Teleport To Closest Player", function()
+	TeleportToClosestPlayer()
+end)
+
+PlayerTab:Button("Teleport To Player", function()
+	TeleportToPlayer()
+end)
+
+PlayerTab:Textbox("Teleport Target", "Username", function(txt)
+	CurrentTarget = txt
+end)
+
+PlayerTab:Label("Other")
+
+PlayerTab:Toggle("Noclip", function(bool)
+	Noclip(bool)
+end)
+
+PlayerTab:Toggle("AutoRotate", function(bool)
+	AutoRotate(bool)
+end)
+
+-- VISUAL TAB
+VisualTab:Label("Auras")
+
+VisualTab:Toggle("ESP", function(bool)
+	ESP(bool)
+end)
+
+VisualTab:Label("Camera")
+
+VisualTab:Toggle("Custom Zoom Distance", function(bool)
+	ZoomDistance(bool)
+end)
+
+VisualTab:Slider("Zoom Distance", 12, 1024, function(value)
+	ZoomValue = value
+end)
+
+VisualTab:Label("Lighting")
+
+VisualTab:Toggle("Fullbright", function(bool)
+	LightingToggle(bool)
+end)
+
+-- MISC TAB
+MiscTab:Toggle("Force Chat Enable", function(bool)
+	ForceChatEnable(bool)
+end)
+
+-- FUNCTIONS
+function CFrameWalk(Toggle)
+	if not Toggle then 
+		Connections.CFrameWalkConnection:Disconnect()
+		Connections.CFrameWalkConnection = nil
+		return 
+	end
+
+	Connections.CFrameWalkConnection = RunService.Heartbeat:Connect(function(deltaTime)
+		local Character = Player.Character
+		local Humanoid = Character:FindFirstChildOfClass('Humanoid')
+		local Root = Character:WaitForChild("HumanoidRootPart")
+
+		local moveDirection = Humanoid.MoveDirection
+
+		if moveDirection.Magnitude > 0 then
+			local moveVector = moveDirection.Unit * CFrameWalkSpeed * deltaTime
+			Root.CFrame = Root.CFrame + moveVector
+		end
+	end)
+end
+
+function ESP(Toggle)
+	if not Toggle then 
+		Connections.ESP_Connection:Disconnect();
+		Connections.ESP_Connection = nil
+
+		for _, OtherPlayer in pairs(Players:GetPlayers()) do
+			local Character = OtherPlayer and OtherPlayer.Character
+
+			for _, Part in pairs(Character:GetChildren()) do
+				if Part:IsA("BasePart") then
+					local ESP_Object = Part:FindFirstChild("BoxHandleAdornment")
+
+					if ESP_Object then
+						ESP_Object:Destroy()
+					end
+				end
+			end
+		end
+
+		return
+	end
+
+	Connections.ESP_Connection = RunService.RenderStepped:Connect(function()
+		for _, OtherPlayer in pairs(Players:GetPlayers()) do
+			local Character = OtherPlayer and OtherPlayer.Character
+			local ESP_Object = Character and Character:FindFirstChild("BoxHandleAdornment", true)
+
+			if not ESP_Object and Character and OtherPlayer ~= Player then
+				for _, Part in pairs(Character:GetChildren()) do
+					if Part:IsA("BasePart") then
+						ESP_Object = Instance.new("BoxHandleAdornment")
+
+						ESP_Object.Name = "BoxHandleAdornment"
+						ESP_Object.Adornee = Part
+						ESP_Object.Visible = true
+						ESP_Object.AlwaysOnTop = true
+						ESP_Object.Size = Part.Size + Vector3.new(1.5,1.5,1.5)
+						ESP_Object.Color3 = Color3.fromRGB(255,0,0)
+						ESP_Object.Transparency = .6
+						ESP_Object.ZIndex = 10
+
+						ESP_Object.Parent = Part
+					end
+				end
+			end
+		end
+	end)
+end
+
+function ForceChatEnable(Toggle)
+	if not Toggle then 
+		Connections.ChatConnection:Disconnect()
+		Connections.ChatConnection = nil
+		return
+	end
+
+	Connections.ChatConnection = RunService.RenderStepped:Connect(function()
+		TextChatService.ChatWindowConfiguration.Enabled = true
+		TextChatService.ChatInputBarConfiguration.Enabled = true
+	end)
+end
+
+function AutoRotate(Toggle)
+	if not Toggle then 
+		Connections.AutoRotateConnection:Disconnect()
+		Connections.AutoRotateConnection = nil
+		return
+	end
+
+	Connections.AutoRotateConnection = RunService.RenderStepped:Connect(function()
+		local Character = Player.Character
+		local Humanoid = Character:FindFirstChildOfClass('Humanoid')
+
+		if Humanoid then
+			Humanoid.AutoRotate = true
+		end
+	end)
+end
+
+function ZoomDistance(Toggle)
+	if not Toggle then 
+		Connections.ZoomConnection:Disconnect()
+		Connections.ZoomConnection = nil
+		return
+	end
+
+	Connections.ZoomConnection = RunService.RenderStepped:Connect(function()
+		Player.CameraMaxZoomDistance = ZoomValue
+	end)
+end
+
+function LightingToggle(Toggle)
+	if not Toggle then 
+		Connections.LightingConnection:Disconnect()
+		Connections.LightingConnection = nil
+		return
+	end
+
+	Connections.LightingConnection = RunService.RenderStepped:Connect(function()
+		Lighting.Brightness = 5
+		Lighting.ClockTime = 14.5
+		Lighting.Ambient = Color3.fromRGB(200,200,200)
+
+		if Lighting.FogEnd then
+			Lighting.FogEnd = 1000000000000
+		end
+
+		if Lighting:FindFirstChildWhichIsA("Atmosphere") then
+			Lighting:FindFirstChildWhichIsA("Atmosphere").Density = 0
+		end
+	end)
+end
+
+function Noclip(Toggle)
+	if not Toggle then 
+		local Character = Player.Character
+		Connections.NoclipConnection:Disconnect()
+		Connections.NoclipConnection = nil
+
+		for _, child in pairs(Character:GetDescendants()) do
+			if child:IsA("BasePart") then
+				child.CanCollide = true
+			end
+		end
+
+		return
+	end
+
+	Connections.NoclipConnection = RunService.Stepped:Connect(function()
+		local Character = Player.Character
+
+		for _, child in pairs(Character:GetChildren()) do
+			if child:IsA("BasePart") and child.CanCollide == true then
+				child.CanCollide = false
+			end
+		end
+	end)
+end
+
+function InfiniteJump(Toggle)
+	if not Toggle then 
+		Connections.InfiniteJumpConnection:Disconnect()
+		Connections.InfiniteJumpConnection = nil
+		return
+	end
+
+	Connections.InfiniteJumpConnection = UserInputService.JumpRequest:Connect(function()
+		local Character = Player.Character
+		local Humanoid = Character and Character:FindFirstChild("Humanoid")
+
+		if Humanoid and not InfiniteJumpCD then
+			InfiniteJumpCD = true
+
+			Humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+
+			task.wait()
+			InfiniteJumpCD = false
+		end
+	end)
+end
+
+function TeleportToPlayer()
+	local Character = Player.Character
+	local Root = Character and Character:FindFirstChild("HumanoidRootPart")
+
+	if not Root then return end
+
+	for _, player in pairs(Players:GetPlayers()) do
+		if player.Name == CurrentTarget then
+			local targetChar = player.Character
+			local targetRoot = targetChar and targetChar:FindFirstChild("HumanoidRootPart")
+			if targetRoot then
+				Root.CFrame = targetRoot.CFrame
+			end
+		else
+			return
+		end
+	end
+end
+
+function TeleportToClosestPlayer()
+	local Character = Player.Character
+	local Root = Character and Character:FindFirstChild("HumanoidRootPart")
+
+	if not Root then return end
+
+	for _, OtherPlayer in pairs(Players:GetPlayers()) do
+		if OtherPlayer ~= Player then
+			local TargetChar = OtherPlayer.Character
+			local TargetRoot = TargetChar and TargetChar:FindFirstChild("HumanoidRootPart")
+
+			if TargetRoot then
+				local Distance = (Root.Position - TargetRoot.Position).Magnitude
+				if Distance < ShortestDistance then
+					ShortestDistance = Distance
+					ClosestPlayer = OtherPlayer
+				end
+			end
+		end
+	end
+
+	if ClosestPlayer then
+		local OtherCharacter = ClosestPlayer and ClosestPlayer.Character
+		local OtherRoot = OtherCharacter and OtherCharacter:FindFirstChild("HumanoidRootPart")
+
+		if OtherRoot then
+			Root.CFrame = OtherRoot.CFrame
+		end
+	else
+		return
+	end
+end
+
+function ChangeJumpHeight(Toggle)
+	if not Toggle then 
+		Connections.JumpHeightConnection:Disconnect()
+		Connections.JumpHeightConnection = nil
+		return
+	end
+
+	Connections.JumpHeightConnection = RunService.RenderStepped:Connect(function()
+		local Character = Player.Character
+		local Humanoid = Character:FindFirstChild("Humanoid")
+
+		if Humanoid then
+			if Humanoid.JumpHeight then
+				Humanoid.JumpHeight = JumpHeight
+			else
+				Humanoid.UseJumpPower = false
+				Humanoid.JumpHeight = JumpHeight
+			end
+		end
+	end)
+end
+
+UserInputService.InputBegan:Connect(function(Input, GameProcessedEvent)
+	if GameProcessedEvent then return end
+
+	if Input.KeyCode == Enum.KeyCode.T then
+		Library:Toggle()
+	end
+end)
